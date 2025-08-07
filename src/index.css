@@ -130,6 +130,7 @@ body {
     display: flex;
     flex-direction: column;
     height: 600px;
+    overflow-y: auto;
 }
 
 /* Command Bar */
@@ -300,7 +301,6 @@ body {
 /* Main Content */
 .app-main {
     flex: 1;
-    overflow-y: auto;
     padding: var(--spacing-xl);
 }
 
@@ -389,7 +389,7 @@ body {
 /* Tasks */
 .tasks-container {
     flex: 1;
-    overflow-y: auto;
+    min-height: 100px;
 }
 
 .tasks-list {
@@ -491,6 +491,7 @@ body {
 
     .app-content {
         height: 70vh;
+        overflow-y: scroll;
     }
 
     .app-header {
