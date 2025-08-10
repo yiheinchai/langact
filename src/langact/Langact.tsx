@@ -6,7 +6,7 @@
  * @returns {object | null} A simplified tree object, or null if the input is invalid.
  */
 import React, { useEffect } from "react";
-import type { ReactNode } from "react";
+import type {} from "react";
 
 // Types for Fiber Node (partial, for our use)
 type FiberNode = {
