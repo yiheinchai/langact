@@ -1,49 +1,122 @@
 // src/components/CommandBar.tsx
 import React, { useState, useContext } from "react";
-import { LangactContext } from "../langact/LangactContext";
-import type { AiAction } from "../langact/types";
+import { LangactActionContext } from "../langact/Langact";
 
-export const CommandBar = () => {
+export const CommandBar: React.FC = () => {
     const [query, setQuery] = useState("");
     const [status, setStatus] = useState("");
-    const context = useContext(LangactContext);
+    const [loading, setLoading] = useState(false);
+    const context = useContext(LangactActionContext);
 
-    const findAndExecuteAction = (command: string) => {
-        if (!context || !command.trim()) return;
+    const sendQueryToLLM = async (query: string) => {
+        if (!query.trim() || !context) return;
+        setLoading(true);
+        setStatus("Thinking...");
+        try {
+            const apiKey =
+                "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";
+            const siteUrl = window.location.origin;
+            const siteTitle = document.title;
+            const response = await fetch(
+                "https://openrouter.ai/api/v1/chat/completions",
+                {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${apiKey}`,
+                        "HTTP-Referer": siteUrl,
+                        "X-Title": siteTitle,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        model: "openai/gpt-oss-20b:free",
+                        messages: [
+                            {
+                                role: "system",
+                                content:
+                                    'You are an AI assistant for a React app. You are given a semantic structure of the UI and a map of available actions. When the user asks for something, respond with a JSON object containing \'actionId\' and \'parameters\' (array). If no action is appropriate, respond with {"actionId": "none"}. Example: {"actionId": "action_0", "parameters": ["hello world"]}',
+                            },
+                            {
+                                role: "user",
+                                content: JSON.stringify({
+                                    query,
+                                    semanticStructure:
+                                        context.semanticStructure,
+                                    llmActionMap: context.llmActionMap,
+                                }),
+                            },
+                        ],
+                    }),
+                }
+            );
+            if (!response.ok) {
+                setStatus("LLM API error: " + response.statusText);
+                setLoading(false);
+                return;
+            }
+            const data = await response.json();
+            // Try to extract the action id and parameters from the LLM's response
+            let actionId = "";
+            let parameters: any[] = [];
 
-        const { actions } = context;
-        let bestAction: AiAction | null = null;
-        let maxScore = 0;
-        const commandWords = command.toLowerCase().split(/\s+/);
-
-        for (const action of actions.values()) {
-            let currentScore = 0;
-            const description = action.description.toLowerCase();
-
-            for (const word of commandWords) {
-                if (description.includes(word)) {
-                    currentScore++;
+            // Parse JSON response from LLM
+            if (
+                data.choices &&
+                data.choices[0] &&
+                data.choices[0].message &&
+                data.choices[0].message.content
+            ) {
+                try {
+                    const llmResponse = JSON.parse(
+                        data.choices[0].message.content.trim()
+                    );
+                    actionId = llmResponse.actionId || "";
+                    parameters = llmResponse.parameters || [];
+                } catch (parseError) {
+                    // Fallback: try to extract just action id if JSON parsing fails
+                    actionId = data.choices[0].message.content
+                        .trim()
+                        .replace(/\"/g, "");
                 }
             }
-
-            if (currentScore > maxScore) {
-                maxScore = currentScore;
-                bestAction = action;
-            }
-        }
-
-        if (bestAction) {
-            setStatus(`Executing: "${bestAction.description}"`);
-            bestAction.handler();
             setQuery("");
-        } else {
-            setStatus(`Sorry, I don't know how to do that.`);
+
+            console.log("LLM Response:", {
+                actionId,
+                parameters,
+            });
+
+            if (
+                actionId &&
+                actionId !== "none" &&
+                context.actionRegistry[actionId]
+            ) {
+                setStatus(
+                    `Executing action: ${actionId} with parameters: ${JSON.stringify(
+                        parameters
+                    )}`
+                );
+                // Execute the action with parameters
+                try {
+                    context.actionRegistry[actionId].execute(...parameters);
+                } catch (err) {
+                    setStatus(`Action execution error: ${String(err)}`);
+                    setLoading(false);
+                    return;
+                }
+            } else if (actionId === "none") {
+                setStatus("No suitable action found for your request.");
+            } else {
+                setStatus("LLM did not return a valid action id.");
+            }
+        } catch (err) {
+            setStatus("Error: " + String(err));
         }
+        setLoading(false);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        findAndExecuteAction(query);
+        sendQueryToLLM(query);
     };
 
     return (
@@ -76,18 +149,22 @@ export const CommandBar = () => {
                         type="text"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search for actions..."
+                        placeholder={
+                            loading
+                                ? "Waiting for AI..."
+                                : "Ask the AI anything..."
+                        }
                         aria-label="AI Command Input"
                         className="search-input"
+                        disabled={loading}
                     />
                 </form>
-                {query && (
+                {query && !loading && (
                     <div className="search-hint">
-                        <kbd>↵</kbd> to execute
+                        <kbd>↵</kbd> to send
                     </div>
                 )}
             </div>
-
             {status && (
                 <div className="status-message">
                     <div className="status-icon">
@@ -110,32 +187,6 @@ export const CommandBar = () => {
                     {status}
                 </div>
             )}
-
-            <div className="actions-panel">
-                <div className="actions-header">
-                    <span>Available Actions</span>
-                    <span className="actions-count">
-                        {context?.actions.size || 0}
-                    </span>
-                </div>
-                <div className="actions-list">
-                    {context &&
-                        Array.from(context.actions.values()).map((action) => (
-                            <div key={action.id} className="action-item">
-                                <div className="action-content">
-                                    <div className="action-id">{action.id}</div>
-                                    <div className="action-description">
-                                        {action.description}
-                                    </div>
-                                </div>
-                                <div className="action-shortcut">
-                                    <kbd>⌘</kbd>
-                                    <kbd>K</kbd>
-                                </div>
-                            </div>
-                        ))}
-                </div>
-            </div>
         </div>
     );
 };

@@ -1,6 +1,5 @@
 // src/components/TodoList.tsx
 import React, { useState } from "react";
-import { useAiAction } from "../langact/useAiAction";
 
 interface Task {
     id: number;
@@ -11,12 +10,6 @@ const TaskItem: React.FC<{ task: Task; onDelete: (id: number) => void }> = ({
     task,
     onDelete,
 }) => {
-    const deleteAction = useAiAction({
-        id: `tasks.delete.${task.id}`,
-        description: `Delete the task: "${task.title}"`,
-        handler: () => onDelete(task.id),
-    });
-
     return (
         <div className="task-item">
             <div className="task-checkbox">
@@ -39,7 +32,7 @@ const TaskItem: React.FC<{ task: Task; onDelete: (id: number) => void }> = ({
             <div className="task-content">
                 <span className="task-title">{task.title}</span>
             </div>
-            <button {...deleteAction.props} className="task-delete">
+            <button onClick={() => onDelete(task.id)} className="task-delete">
                 <svg
                     width="14"
                     height="14"
@@ -67,6 +60,7 @@ export const TodoList = () => {
     const [inputValue, setInputValue] = useState("");
 
     const handleAddTask = () => {
+        console.log("Adding task:", inputValue);
         if (!inputValue.trim()) return;
         const newTask = { id: Date.now(), title: inputValue.trim() };
         setTasks((prev) => [...prev, newTask]);
@@ -76,12 +70,6 @@ export const TodoList = () => {
     const handleDeleteTask = (id: number) => {
         setTasks((prev) => prev.filter((task) => task.id !== id));
     };
-
-    const addAction = useAiAction({
-        id: "tasks.add",
-        description: `Add a new task with the title from the text input field`,
-        handler: handleAddTask,
-    });
 
     return (
         <div className="todo-app">
@@ -134,7 +122,7 @@ export const TodoList = () => {
                         placeholder="Add a new task..."
                         onKeyDown={(e) => e.key === "Enter" && handleAddTask()}
                     />
-                    <button {...addAction.props} className="add-button">
+                    <button onClick={handleAddTask} className="add-button">
                         <svg
                             width="14"
                             height="14"

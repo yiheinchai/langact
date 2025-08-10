@@ -1,10 +1,10 @@
-import { LangactProvider } from "./langact/LangactContext";
 import { TodoList } from "./components/TodoList";
 import { CommandBar } from "./components/CommandBar";
+import { Langact } from "./langact/Langact";
 
 function App() {
     return (
-        <LangactProvider>
+        <Langact>
             <div className="app">
                 <div className="app-header">
                     <div className="app-icon">
@@ -34,7 +34,7 @@ function App() {
                     </div>
                 </div>
             </div>
-        </LangactProvider>
+        </Langact>
     );
 }
 
